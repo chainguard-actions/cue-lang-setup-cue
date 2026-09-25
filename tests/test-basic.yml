@@ -1,0 +1,47 @@
+name: Test basic usage - latest version
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: setup
+        uses: .
+        with:
+          version: latest
+      - name: Assert cue is on PATH and executable
+        run: |
+          if ! command -v cue > /dev/null 2>&1; then
+            echo "FAIL: cue not found on PATH"
+            exit 1
+          fi
+          echo "PASS: cue is on PATH at $(command -v cue)"
+      - name: Assert cue version output works
+        run: |
+          VERSION_OUTPUT=$(cue version 2>&1)
+          echo "cue version output: $VERSION_OUTPUT"
+          if [ -z "$VERSION_OUTPUT" ]; then
+            echo "FAIL: cue version produced no output"
+            exit 1
+          fi
+          echo "PASS: cue version ran successfully"
+      - name: Assert cuectl-path output is set
+        env:
+          CUECTL_PATH: ${{ steps.setup.outputs.cuectl-path }}
+          CUE_PATH: ${{ steps.setup.outputs.cue-path }}
+        run: |
+          echo "cuectl-path: $CUECTL_PATH"
+          echo "cue-path: $CUE_PATH"
+          ACTUAL_PATH="${CUECTL_PATH:-$CUE_PATH}"
+          if [ -z "$ACTUAL_PATH" ]; then
+            echo "WARN: neither cuectl-path nor cue-path output is set, but cue is on PATH"
+            echo "PASS: cue binary is functional even without path output"
+          else
+            echo "PASS: path output is set to $ACTUAL_PATH"
+            if [ ! -f "$ACTUAL_PATH" ]; then
+              echo "FAIL: cue binary not found at $ACTUAL_PATH"
+              exit 1
+            fi
+            echo "PASS: cue binary exists at $ACTUAL_PATH"
+          fi

@@ -1,0 +1,53 @@
+name: Test CUE binary is functional
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: setup
+        uses: .
+        with:
+          version: latest
+      - name: Assert cue is on PATH
+        run: |
+          if ! command -v cue > /dev/null 2>&1; then
+            echo "FAIL: cue not found on PATH"
+            exit 1
+          fi
+          echo "PASS: cue is on PATH at $(command -v cue)"
+      - name: Assert cue version contains expected prefix
+        run: |
+          VERSION_OUTPUT=$(cue version 2>&1)
+          echo "cue version output: $VERSION_OUTPUT"
+          if ! echo "$VERSION_OUTPUT" | grep -qi "cue"; then
+            echo "FAIL: version output does not mention 'cue'"
+            exit 1
+          fi
+          echo "PASS: cue version output looks correct"
+      - name: Assert cue help works
+        run: |
+          HELP_OUTPUT=$(cue help 2>&1 || true)
+          echo "cue help output (first 200 chars): ${HELP_OUTPUT:0:200}"
+          if [ -z "$HELP_OUTPUT" ]; then
+            echo "FAIL: cue help produced no output"
+            exit 1
+          fi
+          echo "PASS: cue help ran successfully"
+      - name: Assert cue can evaluate a simple expression
+        run: |
+          TMPDIR=$(mktemp -d)
+          # Initialize a minimal CUE module so cue commands work
+          cd "$TMPDIR"
+          cue mod init example.com/test 2>&1 || true
+          printf 'package main\n\nx: 42\n' > main.cue
+          EVAL_OUTPUT=$(cue eval . 2>&1)
+          echo "cue eval output: $EVAL_OUTPUT"
+          if echo "$EVAL_OUTPUT" | grep -qi "error"; then
+            echo "FAIL: cue eval reported an error: $EVAL_OUTPUT"
+            exit 1
+          fi
+          echo "PASS: cue eval succeeded"
+          cd /
+          rm -rf "$TMPDIR"
